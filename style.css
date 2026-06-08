@@ -440,10 +440,29 @@ h1, h2, h3, h4, .logo {
 }
 
 /* Заглушки красивого розового градиента для галереи */
-.gallery-item.item-1 { background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(251, 197, 197, 0.2) 100%), #FCDADA; }
-.gallery-item.item-2 { background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(251, 197, 197, 0.2) 100%), #E3B7B7; }
-.gallery-item.item-3 { background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(251, 197, 197, 0.2) 100%), #F0E2E2; }
-.gallery-item.item-4 { background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(251, 197, 197, 0.2) 100%), #EBBBBB; }
+.gallery-item.item-1 {
+  background:
+    linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 100%),
+    url('images/nude.jpg') center/cover no-repeat;
+}
+
+.gallery-item.item-2 {
+  background:
+    linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 100%),
+    url('images/cat.jpg') center/cover no-repeat;
+}
+
+.gallery-item.item-3 {
+  background:
+    linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 100%),
+    url('images/french.jpg') center/cover no-repeat;
+}
+
+.gallery-item.item-4 {
+  background:
+    linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 100%),
+    url('images/art.jpg') center/cover no-repeat;
+}
 
 .gallery-item span {
   color: white;

@@ -1,4 +1,6 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbzCP5QQ_I7cYqn5sttnvyrRbCpT95rDSd1KpOC1v0dun555hL1W4yRkOUVFLukxS3fu5Q/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvLSLiRqxr_gzXiuGyPVLSfQmb-ZIhlLhDBMGpZv9fBUYqxf4RXAZjtbnsdtT0nH3JaQ/exec';
+// ВСТАВЬ СЮДА ЮЗЕРНЕЙМ ТВОЕГО БОТА (без @)
+const BOT_USERNAME = 'YuliaNailBot'; 
 
 const menuToggle = document.getElementById('menuToggle');
 const nav = document.getElementById('nav');
@@ -50,25 +52,6 @@ function getDateObject(dateString) {
   return new Date(`${dateString}T00:00:00`);
 }
 
-function timeToMinutes(timeString) {
-  const [hours, minutes] = timeString.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function isToday(dateString) {
-  return dateString === getTodayYMD();
-}
-
-function isPastTimeForDate(dateString, timeString) {
-  if (!isToday(dateString)) return false;
-
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const slotMinutes = timeToMinutes(timeString);
-
-  return slotMinutes <= nowMinutes;
-}
-
 function isOffDay(dateString) {
   const day = getDateObject(dateString).getDay();
   return offDays.includes(day);
@@ -82,6 +65,27 @@ function getBookedTimes(dateString) {
   return Array.isArray(bookings[dateString]) ? bookings[dateString] : [];
 }
 
+// НОВАЯ ФУНКЦИЯ: Проверяет, осталось ли до сеанса меньше 24 часов
+function isTimeSlotTooSoon(dateString, timeString) {
+  const now = new Date();
+  
+  // Разбиваем дату и время, чтобы избежать проблем с часовыми поясами
+  const [year, month, day] = dateString.split('-').map(Number);
+  const [hours, minutes] = timeString.split(':').map(Number);
+  
+  // Создаем объект даты для выбранного окошка
+  const slotDate = new Date(year, month - 1, day, hours, minutes, 0);
+  
+  // Вычисляем разницу в миллисекундах
+  const diffInMs = slotDate.getTime() - now.getTime();
+  
+  // 24 часа в миллисекундах (24 часа * 60 мин * 60 сек * 1000 мс)
+  const hours24InMs = 24 * 60 * 60 * 1000;
+  
+  // Возвращаем true, если времени осталось меньше 24 часов
+  return diffInMs < hours24InMs;
+}
+
 function getFreeTimes(dateString) {
   if (!dateString) return [];
   if (isOffDay(dateString)) return [];
@@ -90,7 +94,8 @@ function getFreeTimes(dateString) {
   const bookedTimes = getBookedTimes(dateString);
 
   return availableHours.filter(time => {
-    return !bookedTimes.includes(time) && !isPastTimeForDate(dateString, time);
+    // Отсеиваем занятое время И время, до которого меньше 24 часов
+    return !bookedTimes.includes(time) && !isTimeSlotTooSoon(dateString, time);
   });
 }
 
@@ -115,10 +120,10 @@ function renderTimeSlots(dateString) {
   selectedTimeInput.value = '';
 
   if (!freeTimes.length) {
-    if (isToday(dateString)) {
-      resetTimeSlots('На сегодня свободных окошек больше нет');
+    if (dateString === getTodayYMD() || new Date(dateString) < new Date(new Date().getTime() + 24 * 60 * 60 * 1000)) {
+       resetTimeSlots('На ближайшие 24 часа свободных окошек нет');
     } else {
-      resetTimeSlots('На эту дату свободных окошек нет');
+       resetTimeSlots('На эту дату свободных окошек нет');
     }
     return;
   }
@@ -142,7 +147,8 @@ function renderTimeSlots(dateString) {
 }
 
 async function loadCalendarData() {
-  const response = await fetch(`${API_URL}?action=getCalendarData&_=${Date.now()}`);
+  // Просто стучимся по ссылке, добавляя случайное число от кэширования
+  const response = await fetch(`${API_URL}?_=${Date.now()}`);
   const data = await response.json();
 
   if (!data.success) {
@@ -250,8 +256,9 @@ if (bookingForm) {
       return;
     }
 
-    if (isPastTimeForDate(date, time)) {
-      alert('Это время на сегодня уже прошло.');
+    // ИСПОЛЬЗУЕМ НОВУЮ ПРОВЕРКУ
+    if (isTimeSlotTooSoon(date, time)) {
+      alert('Запись возможна минимум за 24 часа. Пожалуйста, выберите другое время.');
       renderTimeSlots(date);
       return;
     }
@@ -291,12 +298,18 @@ if (bookingForm) {
         resetTimeSlots('Выберите другую дату');
       }
 
+      // ФОРМИРУЕМ ССЫЛКУ ДЛЯ ТЕЛЕГРАМ БОТА
+      const safeDate = date.replace(/-/g, '');
+      const safeTime = time.replace(':', '');
+      const tgPayload = `${safeDate}_${safeTime}`;
+
       modalSummary.innerHTML = `
-        <strong>${name}</strong>, вы успешно записаны!<br><br>
-        Услуга: <strong>${service}</strong><br>
-        Дата: <strong>${formatDateToHuman(date)}</strong><br>
-        Время: <strong>${time}</strong><br><br>
-        Ваша запись сохранена. Юлия свяжется с вами при необходимости.
+        <strong>${name}</strong>, место предварительно забронировано!<br><br>
+        Чтобы подтвердить запись и получить электронный талон, нажмите на кнопку ниже:
+        <br><br>
+        <a href="https://t.me/${BOT_USERNAME}?start=${tgPayload}" target="_blank" style="display: inline-block; background: #229ED9; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; margin-top: 10px; transition: transform 0.2s;">
+          ✈️ Подтвердить в Telegram
+        </a>
       `;
 
       confirmModal.classList.add('active');

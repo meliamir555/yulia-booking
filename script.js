@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbzObpr5GPVRGfaivUeM-lUAaFoNy8YrEKkuBS6wLMU1EB7Fm_FbIu9yMTZtKGWT-R94yg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzCP5QQ_I7cYqn5sttnvyrRbCpT95rDSd1KpOC1v0dun555hL1W4yRkOUVFLukxS3fu5Q/exec';
 
 const menuToggle = document.getElementById('menuToggle');
 const nav = document.getElementById('nav');
@@ -50,25 +50,6 @@ function getDateObject(dateString) {
   return new Date(`${dateString}T00:00:00`);
 }
 
-function timeToMinutes(timeString) {
-  const [hours, minutes] = timeString.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function isToday(dateString) {
-  return dateString === getTodayYMD();
-}
-
-function isPastTimeForDate(dateString, timeString) {
-  if (!isToday(dateString)) return false;
-
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const slotMinutes = timeToMinutes(timeString);
-
-  return slotMinutes <= nowMinutes;
-}
-
 function isOffDay(dateString) {
   const day = getDateObject(dateString).getDay();
   return offDays.includes(day);
@@ -82,6 +63,17 @@ function getBookedTimes(dateString) {
   return Array.isArray(bookings[dateString]) ? bookings[dateString] : [];
 }
 
+// НОВАЯ ЛОГИКА: Проверка на 24 часа
+function isTimeSlotTooSoon(dateString, timeString) {
+  const now = new Date();
+  const [year, month, day] = dateString.split('-').map(Number);
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const slotDate = new Date(year, month - 1, day, hours, minutes, 0);
+  const diffInMs = slotDate.getTime() - now.getTime();
+  const hours24InMs = 24 * 60 * 60 * 1000;
+  return diffInMs < hours24InMs;
+}
+
 function getFreeTimes(dateString) {
   if (!dateString) return [];
   if (isOffDay(dateString)) return [];
@@ -90,7 +82,8 @@ function getFreeTimes(dateString) {
   const bookedTimes = getBookedTimes(dateString);
 
   return availableHours.filter(time => {
-    return !bookedTimes.includes(time) && !isPastTimeForDate(dateString, time);
+    // Время должно быть не забронировано И до него должно быть больше 24 часов
+    return !bookedTimes.includes(time) && !isTimeSlotTooSoon(dateString, time);
   });
 }
 
@@ -99,7 +92,6 @@ function isDateDisabled(dateString) {
   if (isOffDay(dateString)) return true;
   if (isManuallyBlocked(dateString)) return true;
   if (getFreeTimes(dateString).length === 0) return true;
-
   return false;
 }
 
@@ -115,10 +107,10 @@ function renderTimeSlots(dateString) {
   selectedTimeInput.value = '';
 
   if (!freeTimes.length) {
-    if (isToday(dateString)) {
-      resetTimeSlots('На сегодня свободных окошек больше нет');
+    if (dateString === getTodayYMD() || new Date(dateString) < new Date(new Date().getTime() + 24 * 60 * 60 * 1000)) {
+       resetTimeSlots('На ближайшие 24 часа свободных окошек нет');
     } else {
-      resetTimeSlots('На эту дату свободных окошек нет');
+       resetTimeSlots('На эту дату свободных окошек нет');
     }
     return;
   }
@@ -132,7 +124,6 @@ function renderTimeSlots(dateString) {
       document.querySelectorAll('.time-slot').forEach(item => {
         item.classList.remove('active');
       });
-
       slot.classList.add('active');
       selectedTimeInput.value = time;
     });
@@ -174,7 +165,6 @@ function refreshCalendarDisabledDates() {
       return isDateDisabled(dateString);
     }
   ]);
-
   calendar.redraw();
 }
 
@@ -199,17 +189,14 @@ function initCalendar() {
         resetTimeSlots();
         return;
       }
-
       if (isManuallyBlocked(dateStr)) {
         resetTimeSlots('Эта дата закрыта мастером');
         return;
       }
-
       if (isOffDay(dateStr)) {
         resetTimeSlots('Выходные: вторник, среда, четверг');
         return;
       }
-
       renderTimeSlots(dateStr);
     }
   });
@@ -225,33 +212,13 @@ if (bookingForm) {
     const name = document.getElementById('clientName').value.trim();
     const phone = document.getElementById('clientPhone').value.trim();
 
-    if (!service) {
-      alert('Пожалуйста, выберите услугу.');
+    if (!service || !date || !time) {
+      alert('Пожалуйста, заполните все поля.');
       return;
     }
 
-    if (!date) {
-      alert('Пожалуйста, выберите дату.');
-      return;
-    }
-
-    if (isOffDay(date)) {
-      alert('Во вторник, среду и четверг записи нет.');
-      return;
-    }
-
-    if (isManuallyBlocked(date)) {
-      alert('Эта дата закрыта для записи.');
-      return;
-    }
-
-    if (!time) {
-      alert('Пожалуйста, выберите удобное время.');
-      return;
-    }
-
-    if (isPastTimeForDate(date, time)) {
-      alert('Это время на сегодня уже прошло.');
+    if (isTimeSlotTooSoon(date, time)) {
+      alert('Запись возможна минимум за 24 часа. Пожалуйста, выберите другое время.');
       renderTimeSlots(date);
       return;
     }
@@ -283,8 +250,10 @@ if (bookingForm) {
         throw new Error(result.message || 'Не удалось оформить запись.');
       }
 
+      // После успешной записи перезагружаем данные календаря
       await loadCalendarData();
 
+      // Скрываем кнопку забронированного времени сразу
       if (!isDateDisabled(date)) {
         renderTimeSlots(date);
       } else {
@@ -292,11 +261,11 @@ if (bookingForm) {
       }
 
       modalSummary.innerHTML = `
-        <strong>${name}</strong>, вы успешно записаны!<br><br>
+        <strong>${name}</strong>, место предварительно забронировано!<br><br>
         Услуга: <strong>${service}</strong><br>
         Дата: <strong>${formatDateToHuman(date)}</strong><br>
         Время: <strong>${time}</strong><br><br>
-        Ваша запись сохранена. Юлия свяжется с вами при необходимости.
+        Я свяжусь с вами в ближайшее время для подтверждения. Жду встречи!
       `;
 
       confirmModal.classList.add('active');
@@ -321,13 +290,8 @@ function closeModal() {
   }
 }
 
-if (modalClose) {
-  modalClose.addEventListener('click', closeModal);
-}
-
-if (modalOkBtn) {
-  modalOkBtn.addEventListener('click', closeModal);
-}
+if (modalClose) modalClose.addEventListener('click', closeModal);
+if (modalOkBtn) modalOkBtn.addEventListener('click', closeModal);
 
 window.addEventListener('click', (e) => {
   if (e.target === confirmModal) {
@@ -340,9 +304,7 @@ window.addEventListener('click', (e) => {
     alert('В script.js нужно вставить URL из Google Apps Script.');
     return;
   }
-
   resetTimeSlots('Сначала выберите дату');
-
   try {
     await loadCalendarData();
     initCalendar();

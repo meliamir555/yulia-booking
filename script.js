@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbzCP5QQ_I7cYqn5sttnvyrRbCpT95rDSd1KpOC1v0dun555hL1W4yRkOUVFLukxS3fu5Q/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzObpr5GPVRGfaivUeM-lUAaFoNy8YrEKkuBS6wLMU1EB7Fm_FbIu9yMTZtKGWT-R94yg/exec';
 
 const menuToggle = document.getElementById('menuToggle');
 const nav = document.getElementById('nav');

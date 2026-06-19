@@ -256,7 +256,7 @@ if (bookingForm) {
         resetTimeSlots('Выберите другую дату');
       }
 
-      // ВОЗВРАЩАЕМ ПРОСТОЕ И КРАСИВОЕ ОКНО ПОДТВЕРЖДЕНИЯ
+      // ПРОСТОЕ ОКОШКО БЕЗ КНОПКИ TELEGRAM
       modalSummary.innerHTML = `
         <strong>${name}</strong>, место предварительно забронировано!<br><br>
         Услуга: <strong>${service}</strong><br>

@@ -1,6 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbwvLSLiRqxr_gzXiuGyPVLSfQmb-ZIhlLhDBMGpZv9fBUYqxf4RXAZjtbnsdtT0nH3JaQ/exec';
-// ВСТАВЬ СЮДА ЮЗЕРНЕЙМ ТВОЕГО БОТА (без @)
-const BOT_USERNAME = 'YuliaNailBot'; 
+const API_URL = 'https://script.google.com/macros/s/AKfycbwvLSLiRqxr_gzXiuGyPVLSfQmb-ZIhlLhDBMGpZv9fBUYqxf4RXAZjtBnsdtT0nH3JaQ/exec';
 
 const menuToggle = document.getElementById('menuToggle');
 const nav = document.getElementById('nav');
@@ -65,24 +63,13 @@ function getBookedTimes(dateString) {
   return Array.isArray(bookings[dateString]) ? bookings[dateString] : [];
 }
 
-// НОВАЯ ФУНКЦИЯ: Проверяет, осталось ли до сеанса меньше 24 часов
 function isTimeSlotTooSoon(dateString, timeString) {
   const now = new Date();
-  
-  // Разбиваем дату и время, чтобы избежать проблем с часовыми поясами
   const [year, month, day] = dateString.split('-').map(Number);
   const [hours, minutes] = timeString.split(':').map(Number);
-  
-  // Создаем объект даты для выбранного окошка
   const slotDate = new Date(year, month - 1, day, hours, minutes, 0);
-  
-  // Вычисляем разницу в миллисекундах
   const diffInMs = slotDate.getTime() - now.getTime();
-  
-  // 24 часа в миллисекундах (24 часа * 60 мин * 60 сек * 1000 мс)
   const hours24InMs = 24 * 60 * 60 * 1000;
-  
-  // Возвращаем true, если времени осталось меньше 24 часов
   return diffInMs < hours24InMs;
 }
 
@@ -94,7 +81,6 @@ function getFreeTimes(dateString) {
   const bookedTimes = getBookedTimes(dateString);
 
   return availableHours.filter(time => {
-    // Отсеиваем занятое время И время, до которого меньше 24 часов
     return !bookedTimes.includes(time) && !isTimeSlotTooSoon(dateString, time);
   });
 }
@@ -104,7 +90,6 @@ function isDateDisabled(dateString) {
   if (isOffDay(dateString)) return true;
   if (isManuallyBlocked(dateString)) return true;
   if (getFreeTimes(dateString).length === 0) return true;
-
   return false;
 }
 
@@ -137,7 +122,6 @@ function renderTimeSlots(dateString) {
       document.querySelectorAll('.time-slot').forEach(item => {
         item.classList.remove('active');
       });
-
       slot.classList.add('active');
       selectedTimeInput.value = time;
     });
@@ -147,7 +131,6 @@ function renderTimeSlots(dateString) {
 }
 
 async function loadCalendarData() {
-  // Просто стучимся по ссылке, добавляя случайное число от кэширования
   const response = await fetch(`${API_URL}?_=${Date.now()}`);
   const data = await response.json();
 
@@ -180,7 +163,6 @@ function refreshCalendarDisabledDates() {
       return isDateDisabled(dateString);
     }
   ]);
-
   calendar.redraw();
 }
 
@@ -205,17 +187,14 @@ function initCalendar() {
         resetTimeSlots();
         return;
       }
-
       if (isManuallyBlocked(dateStr)) {
         resetTimeSlots('Эта дата закрыта мастером');
         return;
       }
-
       if (isOffDay(dateStr)) {
         resetTimeSlots('Выходные: вторник, среда, четверг');
         return;
       }
-
       renderTimeSlots(dateStr);
     }
   });
@@ -231,32 +210,11 @@ if (bookingForm) {
     const name = document.getElementById('clientName').value.trim();
     const phone = document.getElementById('clientPhone').value.trim();
 
-    if (!service) {
-      alert('Пожалуйста, выберите услугу.');
+    if (!service || !date || !time) {
+      alert('Пожалуйста, заполните все поля.');
       return;
     }
 
-    if (!date) {
-      alert('Пожалуйста, выберите дату.');
-      return;
-    }
-
-    if (isOffDay(date)) {
-      alert('Во вторник, среду и четверг записи нет.');
-      return;
-    }
-
-    if (isManuallyBlocked(date)) {
-      alert('Эта дата закрыта для записи.');
-      return;
-    }
-
-    if (!time) {
-      alert('Пожалуйста, выберите удобное время.');
-      return;
-    }
-
-    // ИСПОЛЬЗУЕМ НОВУЮ ПРОВЕРКУ
     if (isTimeSlotTooSoon(date, time)) {
       alert('Запись возможна минимум за 24 часа. Пожалуйста, выберите другое время.');
       renderTimeSlots(date);
@@ -298,18 +256,13 @@ if (bookingForm) {
         resetTimeSlots('Выберите другую дату');
       }
 
-      // ФОРМИРУЕМ ССЫЛКУ ДЛЯ ТЕЛЕГРАМ БОТА
-      const safeDate = date.replace(/-/g, '');
-      const safeTime = time.replace(':', '');
-      const tgPayload = `${safeDate}_${safeTime}`;
-
+      // ВОЗВРАЩАЕМ ПРОСТОЕ И КРАСИВОЕ ОКНО ПОДТВЕРЖДЕНИЯ
       modalSummary.innerHTML = `
         <strong>${name}</strong>, место предварительно забронировано!<br><br>
-        Чтобы подтвердить запись и получить электронный талон, нажмите на кнопку ниже:
-        <br><br>
-        <a href="https://t.me/${BOT_USERNAME}?start=${tgPayload}" target="_blank" style="display: inline-block; background: #229ED9; color: white; padding: 12px 24px; border-radius: 50px; text-decoration: none; font-weight: bold; margin-top: 10px; transition: transform 0.2s;">
-          ✈️ Подтвердить в Telegram
-        </a>
+        Услуга: <strong>${service}</strong><br>
+        Дата: <strong>${formatDateToHuman(date)}</strong><br>
+        Время: <strong>${time}</strong><br><br>
+        Я свяжусь с вами в ближайшее время для подтверждения. Жду встречи!
       `;
 
       confirmModal.classList.add('active');
@@ -334,13 +287,8 @@ function closeModal() {
   }
 }
 
-if (modalClose) {
-  modalClose.addEventListener('click', closeModal);
-}
-
-if (modalOkBtn) {
-  modalOkBtn.addEventListener('click', closeModal);
-}
+if (modalClose) modalClose.addEventListener('click', closeModal);
+if (modalOkBtn) modalOkBtn.addEventListener('click', closeModal);
 
 window.addEventListener('click', (e) => {
   if (e.target === confirmModal) {
@@ -353,9 +301,7 @@ window.addEventListener('click', (e) => {
     alert('В script.js нужно вставить URL из Google Apps Script.');
     return;
   }
-
   resetTimeSlots('Сначала выберите дату');
-
   try {
     await loadCalendarData();
     initCalendar();

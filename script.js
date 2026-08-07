@@ -1,5 +1,3 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbzObpr5GPVRGfaivUeM-lUAaFoNy8YrEKkuBS6wLMU1EB7Fm_FbIu9yMTZtKGWT-R94yg/exec';
-
 const menuToggle = document.getElementById('menuToggle');
 const nav = document.getElementById('nav');
 
@@ -109,43 +107,62 @@ function resetTimeSlots(message = 'Сначала выберите дату') {
 }
 
 function renderTimeSlots(dateString) {
+  // Получаем список уже занятых часов на эту дату
+  const bookedTimes = getBookedTimes(dateString);
   const freeTimes = getFreeTimes(dateString);
 
   timeSlotsContainer.innerHTML = '';
   selectedTimeInput.value = '';
 
+  // Если свободных мест совсем нет, показываем сообщение
   if (!freeTimes.length) {
     if (isToday(dateString)) {
       resetTimeSlots('На сегодня свободных окошек больше нет');
     } else {
-      resetTimeSlots('На эту дату свободных окошек нет');
+      resetTimeSlots('На эту дату все окошки заняты');
     }
     return;
   }
 
-  freeTimes.forEach(time => {
+  // Перебираем ВСЕ часы работы из массива availableHours
+  availableHours.forEach(time => {
     const slot = document.createElement('div');
     slot.classList.add('time-slot');
     slot.textContent = time;
 
-    slot.addEventListener('click', () => {
-      document.querySelectorAll('.time-slot').forEach(item => {
-        item.classList.remove('active');
-      });
+    // Проверяем, занято ли это время кем-то другим или оно уже прошло
+    const isBooked = bookedTimes.includes(time);
+    const isPast = isPastTimeForDate(dateString, time);
 
-      slot.classList.add('active');
-      selectedTimeInput.value = time;
-    });
+    if (isBooked || isPast) {
+      // Делаем слот серым и неактивным
+      slot.classList.add('disabled');
+      if (isBooked) slot.title = 'Это время уже занято';
+      if (isPast) slot.title = 'Это время уже прошло';
+    } else {
+      // Если слот свободен, добавляем возможность по нему кликнуть
+      slot.addEventListener('click', () => {
+        // Убираем активный класс у всех незаблокированных элементов
+        document.querySelectorAll('.time-slot:not(.disabled)').forEach(item => {
+          item.classList.remove('active');
+        });
+        
+        slot.classList.add('active');
+        selectedTimeInput.value = time;
+      });
+    }
 
     timeSlotsContainer.appendChild(slot);
   });
 }
 
 async function loadCalendarData() {
-  const response = await fetch(`${API_URL}?action=getCalendarData&_=${Date.now()}`);
+  // Обращаемся напрямую к вашему PHP-обработчику
+  const response = await fetch(`get-calendar-data.php?_=${Date.now()}`);
   const data = await response.json();
 
-  if (!data.success) {
+  // Если сервер вернул не объект с данными, а ошибку
+  if (data.error || !data) {
     throw new Error(data.message || 'Ошибка загрузки данных календаря');
   }
 
@@ -163,19 +180,6 @@ async function loadCalendarData() {
       renderTimeSlots(selectedDate);
     }
   }
-}
-
-function refreshCalendarDisabledDates() {
-  if (!calendar) return;
-
-  calendar.set('disable', [
-    function(date) {
-      const dateString = formatDateToYMD(date);
-      return isDateDisabled(dateString);
-    }
-  ]);
-
-  calendar.redraw();
 }
 
 function initCalendar() {
@@ -263,18 +267,22 @@ if (bookingForm) {
     submitButton.textContent = 'Отправляем...';
 
     try {
-      const body = new URLSearchParams({
-        action: 'createBooking',
+      // Формируем JSON-объект, так как booking.php ждет JSON
+      const requestData = {
         service,
         date,
         time,
         name,
         phone
-      });
+      };
 
-      const response = await fetch(API_URL, {
+      // Отправляем данные в booking.php
+      const response = await fetch('booking.php', {
         method: 'POST',
-        body
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
       });
 
       const result = await response.json();
@@ -336,11 +344,6 @@ window.addEventListener('click', (e) => {
 });
 
 (async function init() {
-  if (!API_URL || API_URL.includes('ВСТАВЬ_СЮДА')) {
-    alert('В script.js нужно вставить URL из Google Apps Script.');
-    return;
-  }
-
   resetTimeSlots('Сначала выберите дату');
 
   try {
@@ -348,6 +351,6 @@ window.addEventListener('click', (e) => {
     initCalendar();
   } catch (error) {
     console.error(error);
-    alert('Не удалось загрузить данные календаря. Проверь URL Apps Script.');
+    alert('Не удалось загрузить данные календаря.');
   }
 })();

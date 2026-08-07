@@ -796,3 +796,12 @@ h1, h2, h3, h4, .logo {
   color: white;
   transform: translateY(-2px);
 }
+
+.time-slot.disabled {
+  background-color: #f2eded;
+  color: #b5a7a7;
+  border-color: #e5dcdc;
+  text-decoration: line-through;
+  cursor: not-allowed;
+  pointer-events: none; /* Полностью блокирует клики мыши */
+}
